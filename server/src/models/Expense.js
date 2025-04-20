@@ -21,7 +21,7 @@ const Expense = sequelize.define('Expense', {
     allowNull: false,
   },
   amount: {
-    type: DataTypes.DECIMAL(10, 2),
+    type: DataTypes.DECIMAL(12, 2),
     allowNull: false,
   },
   description: {

@@ -74,6 +74,15 @@ export function useDeleteEvent() {
 
 
 // Expense hooks
+export function useExpense(id: number, options = {}) {
+  return useQuery({
+    queryKey: ['expense', id],
+    queryFn: () => expenseApi.getById(id),
+    enabled: !!id,
+    ...options,
+  });
+}
+
 export function useEventExpenses(eventId: number) {
   return useQuery({
     queryKey: ['expenses', eventId],
@@ -103,8 +112,16 @@ export function useUpdateExpense() {
   
   return useMutation({
     mutationFn: ({ id, data }: { id: number; data: any }) => expenseApi.update(id, data),
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['expenses'] });
+      queryClient.invalidateQueries({ queryKey: ['expense', variables.id] });
+      // Also invalidate the parent event that contains this expense
+      queryClient.invalidateQueries({ 
+        predicate: (query) => {
+          const queryKey = query.queryKey;
+          return queryKey[0] === 'event';
+        }
+      });
       queryClient.invalidateQueries({ queryKey: ['financial-summary'] });
       queryClient.invalidateQueries({ queryKey: ['expense-breakdown'] });
       queryClient.invalidateQueries({ queryKey: ['event-performance'] });

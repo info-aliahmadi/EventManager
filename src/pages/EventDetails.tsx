@@ -42,6 +42,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import { useQueryClient } from '@tanstack/react-query';
 
 const EventDetails = () => {
   const { id } = useParams();
@@ -51,6 +52,7 @@ const EventDetails = () => {
   const { data: event, isLoading, isError, error } = useEvent(eventId);
   const deleteEvent = useDeleteEvent();
   const deleteExpense = useDeleteExpense();
+  const queryClient = useQueryClient();
   
   // Debug error information
   React.useEffect(() => {
@@ -119,6 +121,7 @@ const EventDetails = () => {
     deleteExpense.mutate(expenseId, {
       onSuccess: () => {
         toast.success('Expense deleted successfully');
+        queryClient.invalidateQueries({ queryKey: ['event', eventId] });
       },
       onError: (error) => {
         toast.error('Failed to delete expense');

@@ -6,15 +6,26 @@ const API_BASE_URL = "http://localhost:5000/api";
 async function fetchApi<T>(
   endpoint: string,
   method: string = "GET",
-  data?: any
+  data?: any,
+  includeToken: boolean = true
 ): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`;
   
+  const headers: HeadersInit = {
+    "Content-Type": "application/json",
+  };
+  
+  // Add authorization token if available and needed
+  if (includeToken) {
+    const token = localStorage.getItem('auth_token');
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+  }
+  
   const options: RequestInit = {
     method,
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers,
   };
 
   if (data) {
@@ -37,6 +48,29 @@ async function fetchApi<T>(
     throw error;
   }
 }
+
+// Authentication API
+export const authApi = {
+  register: (userData: { name: string; email: string; password: string }) => 
+    fetchApi<{ user: any; token: string }>("/auth/register", "POST", userData, false),
+  
+  login: (credentials: { email: string; password: string }) => 
+    fetchApi<{ user: any; token: string }>("/auth/login", "POST", credentials, false),
+  
+  verifyToken: () => 
+    fetchApi<{ user: any }>("/auth/verify", "GET"),
+  
+  updateProfile: (data: { name?: string; email?: string; phone?: string; bio?: string }) =>
+    fetchApi<{ user: any }>("/auth/profile", "PUT", data),
+  
+  changePassword: (data: { currentPassword: string; newPassword: string }) =>
+    fetchApi<{ message: string }>("/auth/change-password", "POST", data),
+    
+  logout: () => {
+    localStorage.removeItem('auth_token');
+    return Promise.resolve();
+  }
+};
 
 // Events API
 export const eventApi = {
@@ -70,6 +104,7 @@ export const systemApi = {
 };
 
 export default {
+  authApi,
   eventApi,
   expenseApi,
   reportApi,

@@ -7,6 +7,14 @@ const Event = sequelize.define('Event', {
     primaryKey: true,
     autoIncrement: true,
   },
+  userId: {
+    type: DataTypes.INTEGER,
+    allowNull: true, // Setting to true temporarily to avoid breaking existing records
+    references: {
+      model: 'users',
+      key: 'id',
+    },
+  },
   name: {
     type: DataTypes.STRING,
     allowNull: false,

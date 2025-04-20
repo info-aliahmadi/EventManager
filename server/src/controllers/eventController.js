@@ -38,11 +38,25 @@ exports.getEventById = async (req, res) => {
 exports.createEvent = async (req, res) => {
   const eventData = req.body; // Contains both event details and the expenses array
   
+  // Extract userId from authenticated user (assuming authentication middleware sets req.user)
+  const userId = req.user ? req.user.id : null;
+  
+  console.log('Received event data:', JSON.stringify(eventData));
+  console.log('User ID from authentication:', userId);
+  
+  // Add userId to the event data
+  const eventDataWithUser = {
+    ...eventData,
+    userId: userId
+  };
+  
   const t = await sequelize.transaction(); // Start a transaction
 
   try {
-    // 1. Create the Event within the transaction
-    const newEvent = await Event.create(eventData, { transaction: t });
+    // 1. Create the Event within the transaction with userId included
+    console.log('Attempting to create event with data:', JSON.stringify(eventDataWithUser));
+    const newEvent = await Event.create(eventDataWithUser, { transaction: t });
+    console.log('Event created successfully:', newEvent.id);
 
     // 2. If event created and expenses exist, create associated expenses
     if (newEvent && eventData.expenses && eventData.expenses.length > 0) {

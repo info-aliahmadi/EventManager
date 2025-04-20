@@ -5,6 +5,7 @@ const { testConnection, sequelize } = require('./config/database');
 
 // Import routes
 const eventRoutes = require('./routes/eventRoutes');
+const authRoutes = require('./routes/authRoutes');
 const expenseRoutes = require('./routes/expenseRoutes');
 const reportRoutes = require('./routes/reportRoutes');
 const systemRoutes = require('./routes/systemRoutes');
@@ -20,6 +21,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // Routes
 app.use('/api', eventRoutes);
+app.use('/api/auth', authRoutes);
 app.use('/api', expenseRoutes);
 app.use('/api', reportRoutes);
 app.use('/api', systemRoutes);

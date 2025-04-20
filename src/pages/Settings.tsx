@@ -1,5 +1,5 @@
-import React from 'react';
-import { User, Bell, Shield, Palette, Globe, CreditCard, Mail, Save } from 'lucide-react';
+import React, { useState } from 'react';
+import { User, Bell, Shield, Palette, Globe, CreditCard, Mail, Save, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -30,11 +30,147 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 import { toast } from '@/components/ui/sonner';
+import { useUser, useUpdateProfile, useChangePassword } from '@/hooks/use-auth';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const Settings = () => {
+  // Get the current user
+  const { data: user, isLoading: isLoadingUser } = useUser();
+  
+  // Profile update state
+  const [profileData, setProfileData] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    bio: ''
+  });
+  
+  // Password change state
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+  
+  // Validation errors
+  const [profileErrors, setProfileErrors] = useState<string[]>([]);
+  const [passwordErrors, setPasswordErrors] = useState<string[]>([]);
+  
+  // Mutations
+  const updateProfile = useUpdateProfile();
+  const changePassword = useChangePassword();
+  
+  // Generic save handler for tabs other than profile
   const handleSave = () => {
     toast.success('Settings saved successfully!');
   };
+
+  // Load user data into form when available
+  React.useEffect(() => {
+    if (user) {
+      setProfileData({
+        name: user.name || '',
+        email: user.email || '',
+        phone: user.phone || '',
+        bio: user.bio || ''
+      });
+    }
+  }, [user]);
+
+  // Handle profile form changes
+  const handleProfileChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    setProfileData({
+      ...profileData,
+      [e.target.id]: e.target.value
+    });
+  };
+
+  // Handle password form changes
+  const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setPasswordData({
+      ...passwordData,
+      [e.target.id]: e.target.value
+    });
+  };
+
+  // Handle profile save
+  const handleSaveProfile = () => {
+    // Validate form
+    const errors = [];
+    if (!profileData.name) errors.push("Name is required");
+    if (!profileData.email) errors.push("Email is required");
+    
+    if (errors.length > 0) {
+      setProfileErrors(errors);
+      return;
+    }
+    
+    // Clear errors
+    setProfileErrors([]);
+    
+    // Update profile
+    updateProfile.mutate(profileData, {
+      onSuccess: () => {
+        toast.success('Profile updated successfully!');
+      },
+      onError: (error) => {
+        toast.error('Failed to update profile');
+        console.error('Error updating profile:', error);
+      }
+    });
+  };
+
+  // Handle password save
+  const handleUpdateSecurity = () => {
+    // Validate form
+    const errors = [];
+    if (!passwordData.currentPassword) errors.push("Current password is required");
+    if (!passwordData.newPassword) errors.push("New password is required");
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      errors.push("Passwords do not match");
+    }
+    if (passwordData.newPassword.length < 8) {
+      errors.push("Password must be at least 8 characters");
+    }
+    
+    if (errors.length > 0) {
+      setPasswordErrors(errors);
+      return;
+    }
+    
+    // Clear errors
+    setPasswordErrors([]);
+    
+    // Change password
+    changePassword.mutate({
+      currentPassword: passwordData.currentPassword,
+      newPassword: passwordData.newPassword
+    }, {
+      onSuccess: () => {
+        toast.success('Password changed successfully!');
+        // Clear password fields
+        setPasswordData({
+          currentPassword: '',
+          newPassword: '',
+          confirmPassword: ''
+        });
+      },
+      onError: (error) => {
+        toast.error('Failed to change password');
+        console.error('Error changing password:', error);
+      }
+    });
+  };
+
+  // Loading state
+  if (isLoadingUser) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <span className="ml-2 text-lg">Loading settings...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 w-full mx-auto max-w-5xl">
@@ -62,6 +198,19 @@ const Settings = () => {
         
         {/* Profile Tab */}
         <TabsContent value="profile" className="space-y-6 mt-6">
+          {profileErrors.length > 0 && (
+            <Alert variant="destructive">
+              <AlertTitle>Error</AlertTitle>
+              <AlertDescription>
+                <ul className="list-disc pl-4">
+                  {profileErrors.map((error, index) => (
+                    <li key={index}>{error}</li>
+                  ))}
+                </ul>
+              </AlertDescription>
+            </Alert>
+          )}
+          
           <Card>
             <CardHeader>
               <CardTitle>Profile Information</CardTitle>
@@ -74,7 +223,7 @@ const Settings = () => {
                 <div className="flex flex-col items-center gap-2">
                   <Avatar className="h-24 w-24">
                     <AvatarImage src="https://github.com/shadcn.png" />
-                    <AvatarFallback>CN</AvatarFallback>
+                    <AvatarFallback>{user?.name?.charAt(0) || 'U'}</AvatarFallback>
                   </Avatar>
                   <Button variant="outline" size="sm">Change Photo</Button>
                 </div>
@@ -82,17 +231,30 @@ const Settings = () => {
                 <div className="grid gap-4 flex-1">
                   <div className="grid gap-2">
                     <Label htmlFor="name">Full Name</Label>
-                    <Input id="name" defaultValue="Sarah Johnson" />
+                    <Input 
+                      id="name" 
+                      value={profileData.name} 
+                      onChange={handleProfileChange}
+                    />
                   </div>
                   
                   <div className="grid gap-2">
                     <Label htmlFor="email">Email Address</Label>
-                    <Input id="email" type="email" defaultValue="sarah.j@example.com" />
+                    <Input 
+                      id="email" 
+                      type="email" 
+                      value={profileData.email} 
+                      onChange={handleProfileChange}
+                    />
                   </div>
                   
                   <div className="grid gap-2">
                     <Label htmlFor="phone">Phone Number</Label>
-                    <Input id="phone" defaultValue="+971 55 123 4567" />
+                    <Input 
+                      id="phone" 
+                      value={profileData.phone} 
+                      onChange={handleProfileChange}
+                    />
                   </div>
                 </div>
               </div>
@@ -105,13 +267,14 @@ const Settings = () => {
                   <Textarea 
                     id="bio" 
                     rows={4}
-                    defaultValue="Event manager and organizer for Rumba events. Passionate about creating memorable dance experiences."
+                    value={profileData.bio}
+                    onChange={handleProfileChange}
                   />
                 </div>
                 
                 <div className="grid gap-2">
                   <Label htmlFor="role">Role</Label>
-                  <Select defaultValue="manager">
+                  <Select defaultValue={user?.role || "user"} disabled>
                     <SelectTrigger id="role">
                       <SelectValue placeholder="Select role" />
                     </SelectTrigger>
@@ -119,16 +282,28 @@ const Settings = () => {
                       <SelectItem value="admin">Administrator</SelectItem>
                       <SelectItem value="manager">Event Manager</SelectItem>
                       <SelectItem value="analyst">Financial Analyst</SelectItem>
-                      <SelectItem value="viewer">Viewer</SelectItem>
+                      <SelectItem value="user">User</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               </div>
             </CardContent>
             <CardFooter className="flex justify-end">
-              <Button onClick={handleSave}>
-                <Save className="mr-2 h-4 w-4" />
-                Save Changes
+              <Button 
+                onClick={handleSaveProfile} 
+                disabled={updateProfile.isPending}
+              >
+                {updateProfile.isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="mr-2 h-4 w-4" />
+                    Save Changes
+                  </>
+                )}
               </Button>
             </CardFooter>
           </Card>
@@ -141,19 +316,47 @@ const Settings = () => {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              {passwordErrors.length > 0 && (
+                <Alert variant="destructive">
+                  <AlertTitle>Error</AlertTitle>
+                  <AlertDescription>
+                    <ul className="list-disc pl-4">
+                      {passwordErrors.map((error, index) => (
+                        <li key={index}>{error}</li>
+                      ))}
+                    </ul>
+                  </AlertDescription>
+                </Alert>
+              )}
+            
               <div className="grid gap-2">
-                <Label htmlFor="current-password">Current Password</Label>
-                <Input id="current-password" type="password" />
+                <Label htmlFor="currentPassword">Current Password</Label>
+                <Input 
+                  id="currentPassword" 
+                  type="password" 
+                  value={passwordData.currentPassword}
+                  onChange={handlePasswordChange}
+                />
               </div>
               
               <div className="grid gap-2">
-                <Label htmlFor="new-password">New Password</Label>
-                <Input id="new-password" type="password" />
+                <Label htmlFor="newPassword">New Password</Label>
+                <Input 
+                  id="newPassword" 
+                  type="password" 
+                  value={passwordData.newPassword}
+                  onChange={handlePasswordChange}
+                />
               </div>
               
               <div className="grid gap-2">
-                <Label htmlFor="confirm-password">Confirm New Password</Label>
-                <Input id="confirm-password" type="password" />
+                <Label htmlFor="confirmPassword">Confirm New Password</Label>
+                <Input 
+                  id="confirmPassword" 
+                  type="password" 
+                  value={passwordData.confirmPassword}
+                  onChange={handlePasswordChange}
+                />
               </div>
               
               <div className="flex items-center justify-between pt-4">
@@ -167,9 +370,21 @@ const Settings = () => {
               </div>
             </CardContent>
             <CardFooter className="flex justify-end">
-              <Button onClick={handleSave}>
-                <Shield className="mr-2 h-4 w-4" />
-                Update Security
+              <Button 
+                onClick={handleUpdateSecurity}
+                disabled={changePassword.isPending}
+              >
+                {changePassword.isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Updating...
+                  </>
+                ) : (
+                  <>
+                    <Shield className="mr-2 h-4 w-4" />
+                    Update Security
+                  </>
+                )}
               </Button>
             </CardFooter>
           </Card>

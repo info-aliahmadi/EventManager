@@ -1,4 +1,4 @@
-const { Event, EventData, Expense, sequelize } = require('../models');
+const { Event, Expense, sequelize } = require('../models');
 
 // Check database connection and model integrity
 exports.checkDatabaseHealth = async (req, res) => {
@@ -9,7 +9,6 @@ exports.checkDatabaseHealth = async (req, res) => {
     // Check models by trying to query each table
     const modelChecks = {
       Event: false,
-      EventData: false,
       Expense: false
     };
     
@@ -18,13 +17,6 @@ exports.checkDatabaseHealth = async (req, res) => {
       modelChecks.Event = true;
     } catch (error) {
       console.error('Error checking Event model:', error);
-    }
-    
-    try {
-      await EventData.findOne();
-      modelChecks.EventData = true;
-    } catch (error) {
-      console.error('Error checking EventData model:', error);
     }
     
     try {

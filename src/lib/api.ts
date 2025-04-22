@@ -1,6 +1,8 @@
 import { toast } from "sonner";
 
-const API_BASE_URL = "http://localhost:5000/api";
+// Use environment variable or fallback to the production URL
+const API_BASE_URL = import.meta.env.VITE_API_URL || 
+                    (import.meta.env.PROD ? "http://srv788805.hstgr.cloud/api" : "http://localhost:5000/api");
 
 // Generic API fetch function with error handling
 async function fetchApi<T>(

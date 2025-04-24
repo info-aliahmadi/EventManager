@@ -13,20 +13,6 @@ export function ActionButtons() {
         </Link>
       </Button>
       
-      <Button asChild size="sm" className="bg-primary/90 hover:bg-primary">
-        <Link to="/add-data" className="flex items-center justify-center">
-          <FileText className="mr-1 h-4 w-4" />
-          <span className="whitespace-nowrap">Add Data</span>
-        </Link>
-      </Button>
-      
-      <Button asChild size="sm" variant="outline">
-        <Link to="/add-expense" className="flex items-center justify-center">
-          <CreditCard className="mr-1 h-4 w-4" />
-          <span className="whitespace-nowrap">Add Expense</span>
-        </Link>
-      </Button>
-      
       <Button size="sm" variant="outline" className="flex items-center justify-center">
         <FileDown className="mr-1 h-4 w-4" />
         <span className="whitespace-nowrap">Export</span>

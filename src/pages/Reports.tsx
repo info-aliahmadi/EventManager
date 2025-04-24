@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Download, FileText, Filter, Calendar } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { Download, FileText, Filter, Calendar, RefreshCcw, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -38,68 +38,98 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts';
-
-// Mock financial data
-const monthlyData = [
-  { month: 'Jan', revenue: 35000, expenses: 18000, profit: 17000 },
-  { month: 'Feb', revenue: 42000, expenses: 22000, profit: 20000 },
-  { month: 'Mar', revenue: 38000, expenses: 19500, profit: 18500 },
-  { month: 'Apr', revenue: 46000, expenses: 24000, profit: 22000 },
-  { month: 'May', revenue: 32000, expenses: 17000, profit: 15000 },
-  { month: 'Jun', revenue: 48000, expenses: 25000, profit: 23000 },
-];
-
-// Mock event performance data
-const eventPerformance = [
-  { 
-    id: '1', 
-    name: 'Friday Night Rumba', 
-    count: 12, 
-    totalRevenue: 120000, 
-    totalExpenses: 65000, 
-    totalProfit: 55000, 
-    avgAttendance: 110,
-    avgProfit: 4583
-  },
-  { 
-    id: '2', 
-    name: 'Saturday Exclusive', 
-    count: 8, 
-    totalRevenue: 160000, 
-    totalExpenses: 80000, 
-    totalProfit: 80000, 
-    avgAttendance: 150,
-    avgProfit: 10000
-  },
-  { 
-    id: '3', 
-    name: 'Monthly Salsa Night', 
-    count: 3, 
-    totalRevenue: 75000, 
-    totalExpenses: 40000, 
-    totalProfit: 35000, 
-    avgAttendance: 200,
-    avgProfit: 11667
-  },
-  { 
-    id: '4', 
-    name: 'Special Guest DJ', 
-    count: 1, 
-    totalRevenue: 35000, 
-    totalExpenses: 20000, 
-    totalProfit: 15000, 
-    avgAttendance: 230,
-    avgProfit: 15000
-  },
-];
+import { Skeleton } from '@/components/ui/skeleton';
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
+import { useFinancialSummary, useMonthlyPerformance, useEventPerformance, useExpenseBreakdown } from '@/hooks/use-api';
 
 const Reports = () => {
   const [timeRange, setTimeRange] = useState('ytd');
+  
+  // Fetch data using React Query hooks
+  const { 
+    data: financialSummary, 
+    isLoading: isLoadingSummary, 
+    error: summaryError,
+    refetch: refetchSummary,
+    isRefetching: isRefetchingSummary
+  } = useFinancialSummary();
+  
+  const { 
+    data: monthlyPerformance, 
+    isLoading: isLoadingMonthly, 
+    error: monthlyError,
+    refetch: refetchMonthly
+  } = useMonthlyPerformance();
+  
+  const { 
+    data: eventPerformance, 
+    isLoading: isLoadingEvents, 
+    error: eventsError,
+    refetch: refetchEvents
+  } = useEventPerformance();
+  
+  const { 
+    data: expenseBreakdown, 
+    isLoading: isLoadingExpenses 
+  } = useExpenseBreakdown();
+
+  // Format the monthly performance data for the chart
+  const formattedMonthlyData = useMemo(() => {
+    if (!monthlyPerformance) return [];
+    
+    return monthlyPerformance.map(item => ({
+      month: new Date(item.month + '-01').toLocaleString('default', { month: 'short' }),
+      revenue: item.revenue,
+      expenses: item.expenses,
+      profit: item.profit
+    }));
+  }, [monthlyPerformance]);
+  
+  // Calculate financial metrics for the cards
+  const totalRevenue = financialSummary?.totalRevenue || 0;
+  const totalExpenses = financialSummary?.totalExpenses || 0;
+  const totalProfit = financialSummary?.totalProfit || 0;
+  const profitMargin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
+  
+  // Refresh all data
+  const handleRefresh = () => {
+    refetchSummary();
+    refetchMonthly();
+    refetchEvents();
+  };
+  
+  // Handle errors
+  const hasError = summaryError || monthlyError || eventsError;
+  if (hasError) {
+    return (
+      <Alert variant="destructive" className="mb-4">
+        <AlertCircle className="h-4 w-4" />
+        <AlertTitle>Error Loading Reports</AlertTitle>
+        <AlertDescription>
+          An error occurred loading report data. Please try again later.
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="mt-2" 
+            onClick={handleRefresh}
+          >
+            <RefreshCcw className="h-4 w-4 mr-2" />
+            Retry
+          </Button>
+        </AlertDescription>
+      </Alert>
+    );
+  }
 
   return (
     <div className="space-y-6 w-full mx-auto">
       <div className="flex justify-between items-center flex-col sm:flex-row gap-4">
-        <h1 className="text-2xl font-semibold">Reports</h1>
+        <div className="flex items-center">
+          <h1 className="text-2xl font-semibold">Reports</h1>
+          {(isRefetchingSummary) && (
+            <RefreshCcw className="h-4 w-4 ml-2 animate-spin text-muted-foreground" />
+          )}
+        </div>
         <div className="flex gap-2">
           <Select value={timeRange} onValueChange={setTimeRange}>
             <SelectTrigger className="w-[180px]">
@@ -113,6 +143,10 @@ const Reports = () => {
               <SelectItem value="lastmonth">Last Month</SelectItem>
             </SelectContent>
           </Select>
+          <Button variant="outline" onClick={handleRefresh} disabled={isRefetchingSummary}>
+            <RefreshCcw className="mr-2 h-4 w-4" />
+            Refresh
+          </Button>
           <Button variant="outline">
             <Download className="mr-2 h-4 w-4" />
             Export
@@ -133,67 +167,103 @@ const Reports = () => {
               <CardTitle>Monthly Financial Performance</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="h-80">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={monthlyData}
-                    margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" />
-                    <YAxis tickFormatter={(value) => `${value / 1000}k`} />
-                    <Tooltip formatter={(value) => [`${value.toLocaleString()} AED`, '']} />
-                    <Legend />
-                    <Bar dataKey="revenue" name="Revenue" fill="#8b5cf6" />
-                    <Bar dataKey="expenses" name="Expenses" fill="#ef4444" />
-                    <Bar dataKey="profit" name="Profit" fill="#10b981" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
+              {isLoadingMonthly ? (
+                <div className="h-80 flex items-center justify-center">
+                  <Skeleton className="h-64 w-full" />
+                </div>
+              ) : (
+                <div className="h-80">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={formattedMonthlyData}
+                      margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="month" />
+                      <YAxis tickFormatter={(value) => `${value / 1000}k`} />
+                      <Tooltip formatter={(value) => [`${value.toLocaleString()} AED`, '']} />
+                      <Legend />
+                      <Bar dataKey="revenue" name="Revenue" fill="#8b5cf6" />
+                      <Bar dataKey="expenses" name="Expenses" fill="#ef4444" />
+                      <Bar dataKey="profit" name="Profit" fill="#10b981" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
             </CardContent>
           </Card>
 
           {/* Financial Metrics Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Total Revenue</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">241,000 AED</div>
-                <p className="text-xs text-muted-foreground mt-1">+12% from previous period</p>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Total Expenses</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">125,500 AED</div>
-                <p className="text-xs text-muted-foreground mt-1">+8% from previous period</p>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Total Profit</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">115,500 AED</div>
-                <p className="text-xs text-muted-foreground mt-1">+18% from previous period</p>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Profit Margin</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">47.9%</div>
-                <p className="text-xs text-muted-foreground mt-1">+5.3% from previous period</p>
-              </CardContent>
-            </Card>
+            {isLoadingSummary ? (
+              <>
+                {[1, 2, 3, 4].map((i) => (
+                  <Card key={i}>
+                    <CardHeader className="pb-2">
+                      <Skeleton className="h-4 w-24" />
+                    </CardHeader>
+                    <CardContent>
+                      <Skeleton className="h-8 w-32 mb-2" />
+                      <Skeleton className="h-4 w-24" />
+                    </CardContent>
+                  </Card>
+                ))}
+              </>
+            ) : (
+              <>
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium text-muted-foreground">Total Revenue</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{totalRevenue.toLocaleString()} AED</div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {financialSummary?.revenueChange > 0 ? '+' : ''}
+                      {financialSummary?.revenueChange}% from previous period
+                    </p>
+                  </CardContent>
+                </Card>
+                
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium text-muted-foreground">Total Expenses</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{totalExpenses.toLocaleString()} AED</div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {financialSummary?.expensesChange > 0 ? '+' : ''}
+                      {financialSummary?.expensesChange}% from previous period
+                    </p>
+                  </CardContent>
+                </Card>
+                
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium text-muted-foreground">Total Profit</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{totalProfit.toLocaleString()} AED</div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {financialSummary?.profitChange > 0 ? '+' : ''}
+                      {financialSummary?.profitChange}% from previous period
+                    </p>
+                  </CardContent>
+                </Card>
+                
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium text-muted-foreground">Profit Margin</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{profitMargin.toFixed(1)}%</div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {(financialSummary?.profitChange - financialSummary?.revenueChange) > 0 ? '+' : ''}
+                      {(financialSummary?.profitChange - financialSummary?.revenueChange).toFixed(1)}% from previous period
+                    </p>
+                  </CardContent>
+                </Card>
+              </>
+            )}
           </div>
         </TabsContent>
         
@@ -204,53 +274,69 @@ const Reports = () => {
               <CardTitle>Event Performance</CardTitle>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Event Name</TableHead>
-                    <TableHead className="hidden md:table-cell">Number of Events</TableHead>
-                    <TableHead className="text-right">Total Revenue</TableHead>
-                    <TableHead className="text-right hidden md:table-cell">Total Profit</TableHead>
-                    <TableHead className="text-right">Avg. Profit</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {eventPerformance.map((event) => (
-                    <TableRow key={event.id}>
-                      <TableCell className="font-medium">{event.name}</TableCell>
-                      <TableCell className="hidden md:table-cell">{event.count}</TableCell>
-                      <TableCell className="text-right">{event.totalRevenue.toLocaleString()} AED</TableCell>
-                      <TableCell className="text-right hidden md:table-cell">{event.totalProfit.toLocaleString()} AED</TableCell>
-                      <TableCell className="text-right">{event.avgProfit.toLocaleString()} AED</TableCell>
+              {isLoadingEvents ? (
+                <div className="space-y-2">
+                  <Skeleton className="h-8 w-full" />
+                  <Skeleton className="h-12 w-full" />
+                  <Skeleton className="h-12 w-full" />
+                  <Skeleton className="h-12 w-full" />
+                  <Skeleton className="h-12 w-full" />
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Event Name</TableHead>
+                      <TableHead className="hidden md:table-cell">Number of Events</TableHead>
+                      <TableHead className="text-right">Total Revenue</TableHead>
+                      <TableHead className="text-right hidden md:table-cell">Total Profit</TableHead>
+                      <TableHead className="text-right">Avg. Profit</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {eventPerformance?.map((event, index) => (
+                      <TableRow key={index}>
+                        <TableCell className="font-medium">{event.name}</TableCell>
+                        <TableCell className="hidden md:table-cell">{event.count}</TableCell>
+                        <TableCell className="text-right">{event.totalRevenue.toLocaleString()} AED</TableCell>
+                        <TableCell className="text-right hidden md:table-cell">{event.totalProfit.toLocaleString()} AED</TableCell>
+                        <TableCell className="text-right">{event.avgProfit.toLocaleString()} AED</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
             </CardContent>
           </Card>
 
-          {/* Top Performing Events Chart */}
+          {/* Event Attendance Chart */}
           <Card>
             <CardHeader>
               <CardTitle>Average Attendance by Event</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="h-80">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={eventPerformance}
-                    margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                    layout="vertical"
-                  >
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis type="number" />
-                    <YAxis dataKey="name" type="category" width={150} />
-                    <Tooltip formatter={(value) => [`${value} attendees`, '']} />
-                    <Legend />
-                    <Bar dataKey="avgAttendance" name="Average Attendance" fill="#8b5cf6" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
+              {isLoadingEvents ? (
+                <div className="h-80 flex items-center justify-center">
+                  <Skeleton className="h-64 w-full" />
+                </div>
+              ) : (
+                <div className="h-80">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={eventPerformance}
+                      margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                      layout="vertical"
+                    >
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis type="number" />
+                      <YAxis dataKey="name" type="category" width={150} />
+                      <Tooltip formatter={(value) => [`${value} attendees`, '']} />
+                      <Legend />
+                      <Bar dataKey="avgAttendance" name="Average Attendance" fill="#8b5cf6" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
